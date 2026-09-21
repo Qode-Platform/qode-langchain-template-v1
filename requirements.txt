@@ -1,4 +1,8 @@
-# mirrors the poetry pyproject the langchain CLI generated
+# mirrors the poetry pyproject the langchain CLI generated, plus the pins that
+# make it install and import on Python 3.12 today.
 langserve[server]>=0.0.30
 uvicorn>=0.23.2
 pydantic<2
+# langserve 0.0.x imports httpx._types.VerifyTypes, removed in httpx 0.28.
+# Without this pin the app dies at import with ImportError, before it can serve.
+httpx<0.28

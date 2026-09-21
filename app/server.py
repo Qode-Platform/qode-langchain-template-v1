@@ -2,6 +2,7 @@ import os
 
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
+from langchain_core.runnables import RunnableLambda
 from langserve import add_routes
 
 
@@ -29,9 +30,12 @@ async def redirect_root_to_docs() -> RedirectResponse:
     return RedirectResponse(f"{BASE_PATH}/docs")
 
 
-# Edit this to add the chain you want to add. Keep BASE_PATH on the front of
-# whatever path you mount it at, or the ingress will not reach it.
-add_routes(app, NotImplemented, path=BASE_PATH or "")
+# A placeholder chain so the template BOOTS. The CLI generates
+# `add_routes(app, NotImplemented)`, which raises before the server ever
+# listens — replace this echo with your real chain.
+echo_chain = RunnableLambda(lambda payload: {"echo": payload})
+
+add_routes(app, echo_chain, path=f"{BASE_PATH}/echo")
 
 if __name__ == "__main__":
     import uvicorn
