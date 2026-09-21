@@ -1,3 +1,6 @@
 .env
 .fleet/
 .fleet-deploy.log
+
+# --- from the LangChain scaffold ---
+__pycache__

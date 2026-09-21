@@ -1,130 +1,118 @@
-# fleet-template-v1
+# LangChain template
 
-## What This Template Is
+Provisioned from [`Qode-Platform/fleet-template-v1`](https://github.com/Qode-Platform/fleet-template-v1) — the fleet
+lifecycle contract (`bin/`, `fleet.conf`, deploy workflows) with a
+LangChain starter laid on top.
 
-`fleet-template-v1` is a **language-agnostic app lifecycle harness** for apps
-managed by the fleet platform. It gives any app — Node, Python, Go, a Docker
-Compose stack, anything — a uniform way to be deployed and controlled, without
-the fleet needing to know a single thing about your stack.
+## Origin
 
-The fleet injects runtime variables into the environment (`PORT`, `BASE_PATH`,
-`DATABASE_URL`) and calls `./bin/run` to deploy. Everything project-specific —
-how to install, build, and start your app — lives in **one file: `fleet.conf`**.
-That is the only file you edit per project.
+    langchain app new (langchain-cli 0.0.37)
 
-## Repository Structure
+Generated 2026-09-21 on Node v22.12.0 / Python 3.12.3. **Dependencies were
+never installed and this has never been built or run.** Boot it once before
+trusting it.
 
-```
-fleet.conf        ← the only file you edit per project
-.env              ← local-only env vars (gitignored)
-bin/
-  _common.sh      ← shared logic; never edit this
-  run             ← install + build + start (called by the fleet)
-  start           ← start only (no rebuild)
-  restart         ← stop + full run
-  reload          ← hot-reload config without rebuild
-  stop            ← stop the running process
-```
+## Fleet lifecycle
 
-## The One File You Edit: `fleet.conf`
+`fleet.conf` drives every script in `bin/`:
 
-`fleet.conf` is sourced as shell by the lifecycle scripts. Fill in the commands
-for your stack; leave any command empty (`''`) to skip that step.
+| step | command |
+|---|---|
+| install | `python3 -m venv .venv && .venv/bin/pip install --upgrade pip -r requirements.txt` |
+| build | `(none)` |
+| start | `.venv/bin/uvicorn app.server:app --host 0.0.0.0 --port $PORT` |
 
-```sh
-NAME="my-app"           # label shown in fleet logs
-PORT="3000"             # default port (fleet overrides via $PORT env var)
-HEALTH_PATH="/"         # HTTP path that returns 200 when the app is ready
+    ./bin/run       # install, build, start in the foreground
+    ./bin/start     # start from existing build artifacts
+    ./bin/restart   # rebuild and restart
+    ./bin/stop      # stop whatever holds the port
 
-INSTALL_CMD='npm ci'
-BUILD_CMD='npm run build'
-START_CMD='node dist/server.js'   # must listen on $PORT; run in foreground
-RELOAD_CMD=''           # optional; empty → falls back to stop+start
-```
+Listens on `$PORT` (default `8000`); health check hits `/docs`.
 
-> **Critical rule:** single-quote any command that uses `$PORT` or
-> `$BASE_PATH`. Single quotes defer variable expansion to **runtime** — when the
-> command actually runs, with the fleet-injected value — rather than at the
-> moment `fleet.conf` is sourced (when those values aren't set yet). Use
-> `START_CMD='gunicorn app:app --bind 0.0.0.0:$PORT'`, never double quotes.
+## What differs from stock output
 
-## How the Lifecycle Works
+- WILL NOT BOOT AS GENERATED: app/server.py calls add_routes(app, NotImplemented). Supply a chain first.
+- Added requirements.txt mirroring the generated pyproject (poetry) so the fleet's pip-based install works.
+- langchain-cli 0.0.37 still emits a LangServe app pinned to pydantic<2. Consider LangGraph for new work.
 
-| Script | What it does | When to use |
-| --- | --- | --- |
-| `bin/run` | `INSTALL_CMD` → `BUILD_CMD` → `START_CMD` | Fleet deploy, fresh start |
-| `bin/start` | `START_CMD` only | Restart without rebuild |
-| `bin/restart` | stop + `bin/run` | After a code/dep change |
-| `bin/reload` | `RELOAD_CMD`, or stop+start if empty | After a config-only change |
-| `bin/stop` | Kill by pidfile or port | Tear down |
+---
 
-> The process PID is written to `.fleet/app.pid` so subsequent `stop`/`restart`
-> calls can find and terminate it reliably. If the pidfile is missing or stale,
-> `stop` falls back to freeing whatever is listening on `$PORT`.
+# langchain
 
-## How to Apply This to Your Project
+## Installation
 
-### Step 1 — Copy the template into your repo
+Install the LangChain CLI if you haven't yet
 
-```sh
-cp -r fleet-template-v1/* my-project/
+```bash
+pip install -U langchain-cli
 ```
 
-Or, if starting fresh, just clone it and work from `main`.
+## Adding packages
 
-### Step 2 — Edit `fleet.conf` (the only required change)
+```bash
+# adding packages from
+# https://github.com/langchain-ai/langchain/tree/master/templates
+langchain app add $PROJECT_NAME
 
-Fill in your stack's commands. Per-stack examples:
+# adding custom GitHub repo packages
+langchain app add --repo $OWNER/$REPO
+# or with whole git string (supports other git providers):
+# langchain app add git+https://github.com/hwchase17/chain-of-verification
 
-```sh
-# Node.js
-INSTALL_CMD='npm ci'
-BUILD_CMD='npm run build'
-START_CMD='node dist/index.js'
-
-# Python (Gunicorn)
-INSTALL_CMD='pip install -r requirements.txt'
-BUILD_CMD=''
-START_CMD='gunicorn app:app --bind 0.0.0.0:$PORT'
-
-# Go
-INSTALL_CMD=''
-BUILD_CMD='go build -o ./out/server ./cmd/server'
-START_CMD='./out/server'
-
-# Docker Compose
-INSTALL_CMD=''
-BUILD_CMD='docker compose build'
-START_CMD='docker compose up'
-RELOAD_CMD='docker compose up -d --no-build'
+# with a custom api mount point (defaults to `/{package_name}`)
+langchain app add $PROJECT_NAME --api_path=/my/custom/path/rag
 ```
 
-### Step 3 — Set local env vars in `.env` (gitignored)
+Note: you remove packages by their api path
 
-```sh
-APP_NAME=My App
-DATABASE_URL=postgres://localhost/mydb
+```bash
+langchain app remove my/custom/path/rag
 ```
 
-### Step 4 — Verify standalone
+## Setup LangSmith (Optional)
 
-```sh
-PORT=3001 bin/run      # should install, build, and serve on 3001
-curl http://localhost:3001/   # should 200
+LangSmith will help us trace, monitor and debug LangChain applications.
+You can sign up for LangSmith [here](https://smith.langchain.com/).
+If you don't have access, you can skip this section
+
+```shell
+export LANGSMITH_TRACING=true
+export LANGSMITH_API_KEY=<your-api-key>
+export LANGSMITH_PROJECT=<your-project>  # if not specified, defaults to "default"
 ```
 
-### Step 5 — Connect to the fleet
+## Launch LangServe
 
-Point the fleet at your repo. It will clone it, inject `PORT` / `BASE_PATH` /
-`DATABASE_URL`, and call `bin/run`. As long as your `START_CMD` listens on
-`$PORT` and `HEALTH_PATH` returns 200, the fleet will mark the app healthy.
+```bash
+langchain serve
+```
 
-## Key Invariants
+## Running in Docker
 
-- **`START_CMD` must run in the foreground and listen on `$PORT`.** Do not use a
-  dev server — HMR / hot-reload chunks 404 behind the ingress and will break the
-  app.
-- **Never put secrets in `fleet.conf`** — it's committed. Use `.env` locally;
-  the fleet injects secrets via the environment.
-- **`bin/_common.sh` is shared infrastructure** — don't edit it per project. All
-  project-specific configuration belongs in `fleet.conf`.
+This project folder includes a Dockerfile that allows you to easily build and host your LangServe app.
+
+### Building the Image
+
+To build the image, you simply:
+
+```shell
+docker build . -t my-langserve-app
+```
+
+If you tag your image with something other than `my-langserve-app`,
+note it for use in the next step.
+
+### Running the Image Locally
+
+To run the image, you'll need to include any environment variables
+necessary for your application.
+
+In the below example, we inject the `OPENAI_API_KEY` environment
+variable with the value set in my local environment
+(`$OPENAI_API_KEY`)
+
+We also expose port 8080 with the `-p 8080:8080` option.
+
+```shell
+docker run -e OPENAI_API_KEY=$OPENAI_API_KEY -p 8080:8080 my-langserve-app
+```

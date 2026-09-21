@@ -1,0 +1,4 @@
+# mirrors the poetry pyproject the langchain CLI generated
+langserve[server]>=0.0.30
+uvicorn>=0.23.2
+pydantic<2
