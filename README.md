@@ -29,6 +29,17 @@ trusting it.
 
 Listens on `$PORT` (default `8000`); health check hits `/docs`.
 
+## BASE_PATH
+
+The fleet injects `BASE_PATH` (`/direct/<agent>:<port>`) and nginx forwards
+that prefix **unchanged** — so this app serves every route and asset under
+it. An empty or unset value means standalone mode: serve at the host root.
+
+- Prefixed docs/openapi URLs, prefixed root redirect, and add_routes(path=BASE_PATH).
+- `HEALTH_PATH` in `fleet.conf` stays un-prefixed; the fleet prepends `$BASE_PATH` itself.
+- A value like `direct/x:3000/` is normalised to `/direct/x:3000`.
+- Still will not boot until add_routes' NotImplemented is replaced with a real chain.
+
 ## What differs from stock output
 
 - WILL NOT BOOT AS GENERATED: app/server.py calls add_routes(app, NotImplemented). Supply a chain first.
