@@ -127,3 +127,23 @@ We also expose port 8080 with the `-p 8080:8080` option.
 ```shell
 docker run -e OPENAI_API_KEY=$OPENAI_API_KEY -p 8080:8080 my-langserve-app
 ```
+
+## Rule: everything under BASE_PATH
+
+The fleet serves this app behind a proxy at `BASE_PATH=/direct/<agent>:<port>`, and the
+prefix is forwarded **unchanged** — it is NOT stripped before it reaches the app. So every
+route, every redirect, every asset URL and the docs/OpenAPI URLs must carry `$BASE_PATH`.
+
+Never hard-code a leading-slash path in a redirect or a response.
+`RedirectResponse("/docs")` and `add_routes(app, chain, path="/echo")` point at the
+proxy's root and 404.
+
+Use this template's own mechanism (FastAPI/LangServe):
+
+- `app/server.py` defines `base_path()` and sets `docs_url`, `redoc_url` and
+  `openapi_url` with the prefix; the root route and its redirect target are built from
+  `BASE_PATH`.
+- Every `add_routes(...)` call passes `path=f"{BASE_PATH}/<chain>"`. For a larger surface,
+  hang the routes off a single `APIRouter(prefix=BASE_PATH)` instead of repeating the
+  f-string.
+- `HEALTH_PATH` in `fleet.conf` stays un-prefixed; the fleet prepends `$BASE_PATH` itself.
